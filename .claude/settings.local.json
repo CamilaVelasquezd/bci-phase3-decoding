@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda run -n bci-ds python -c ' *)",
+      "Read(//c/Users/Usuario/anaconda3/Scripts/**)",
+      "Read(//c/Users/Usuario/miniconda3/**)",
+      "Read(//c/ProgramData/anaconda3/**)",
+      "Read(//c/ProgramData/miniconda3/**)",
+      "Bash(/c/Users/Usuario/anaconda3/Scripts/conda.exe run -n bci-ds python -c ' *)",
+      "Bash(/c/Users/Usuario/anaconda3/Scripts/conda.exe run *)"
+    ]
+  }
+}
