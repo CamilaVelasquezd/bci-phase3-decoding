@@ -56,4 +56,11 @@ def load_session(
     sessions = loader.filter_sessions("dataset_id", dataset_id)
     session_id = sessions[session_index]
     ds = loader.get_processed_data_from_session(session_id)
+    
+    # Merge top-level session attrs (subject_id, object_id, etc.) into dataset attrs.
+    # Processed data attrs take precedence in case of key conflicts.
+    top_level_attrs = dict(loader.combined_zarr[session_id].attrs)
+    merged_attrs = {**top_level_attrs, **ds.attrs}
+    ds.attrs.update(merged_attrs)
+    
     return loader, ds, session_id
