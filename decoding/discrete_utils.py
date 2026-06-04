@@ -3,8 +3,54 @@ from __future__ import annotations
 
 import numpy as np
 import xarray as xr
+from scipy import stats
 
 from decoding.dim_reduction import compute_bin_phases, compute_binned_counts
+
+
+def compute_binned_trial_ids(ds: xr.Dataset, bin_size_ms: int = 50) -> np.ndarray:
+    """Bin trial_id from 1kHz timestep resolution to bin resolution using mode.
+
+    A bin is assigned to whichever trial ID occupies the majority of that window.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Session dataset with ds["trial_id"] of shape (n_time,) at 1kHz, int16.
+    bin_size_ms : int
+        Bin size in milliseconds. Must match the bin size used in compute_binned_counts.
+
+    Returns
+    -------
+    np.ndarray
+        Shape (n_bins,), int16. Trial ID per bin at bin resolution.
+
+    Notes
+    -----
+    Trial ID convention in the zarr schema:
+    - Positive IDs (e.g. 1–212): active reach trials
+    - Negative IDs: inter-trial intervals linked to a nearby trial
+    - ID = 0: transitions or padding
+
+    Use active_mask = trial_id_binned > 0 to select only reach bins.
+    This mask replaces the previous active_mask = bin_phases > 0 convention
+    and is required for Leave-One-Trial-Out (LOTO) cross-validation.
+    """
+    trial_id_raw = ds["trial_id"].values  # (n_time,), int16
+    n_time = len(trial_id_raw)
+    n_bins = n_time // bin_size_ms
+
+    # Trim to fit exactly into bins
+    n_time_trimmed = n_bins * bin_size_ms
+    trial_id_trimmed = trial_id_raw[:n_time_trimmed]
+
+    # Reshape to (n_bins, bin_size_ms)
+    trial_id_reshaped = trial_id_trimmed.reshape(n_bins, bin_size_ms)
+
+    # Compute mode along axis=1 (for each bin, find the most common trial ID)
+    trial_id_binned = stats.mode(trial_id_reshaped, axis=1, keepdims=False).mode
+
+    return trial_id_binned.astype(np.int16)
 
 
 def compute_trial_averages(
