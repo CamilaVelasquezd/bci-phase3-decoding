@@ -53,6 +53,48 @@ def compute_binned_trial_ids(ds: xr.Dataset, bin_size_ms: int = 50) -> np.ndarra
     return trial_id_binned.astype(np.int16)
 
 
+def get_trial_data(
+    X_all: np.ndarray,
+    y_all: np.ndarray,
+    trial_id_binned: np.ndarray,
+) -> list[dict]:
+    """Organize binned spike counts and velocity into per-trial chunks.
+
+    Parameters
+    ----------
+    X_all : np.ndarray
+        Shape (n_bins, n_electrodes). Full session binned spike counts.
+    y_all : np.ndarray
+        Shape (n_bins, 2). Full session binned velocity (vx, vy).
+    trial_id_binned : np.ndarray
+        Shape (n_bins,). Trial ID per bin from compute_binned_trial_ids.
+        Positive IDs = active reach trials. Zero and negative = ITI/padding.
+
+    Returns
+    -------
+    list[dict]
+        One dict per trial, sorted by trial_id, each with keys:
+            'trial_id' : int
+            'X'        : np.ndarray, shape (n_bins_in_trial, n_electrodes)
+            'y'        : np.ndarray, shape (n_bins_in_trial, 2)
+
+    Notes
+    -----
+    Only positive trial IDs are included (active reach trials).
+    Trials are sorted by trial_id to ensure consistent ordering across sessions.
+    """
+    unique_ids = np.unique(trial_id_binned[trial_id_binned > 0])
+    trials = []
+    for tid in unique_ids:
+        mask = trial_id_binned == tid
+        trials.append({
+            "trial_id": int(tid),
+            "X": X_all[mask],
+            "y": y_all[mask],
+        })
+    return trials
+
+
 def compute_trial_averages(
     ds: xr.Dataset, bin_size_ms: int = 50
 ) -> tuple[np.ndarray, np.ndarray]:
