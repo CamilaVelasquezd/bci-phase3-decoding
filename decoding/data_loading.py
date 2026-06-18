@@ -7,6 +7,17 @@ import xarray as xr
 from bci_decoding_dataset import DatasetLoader
 
 
+def merge_session_attrs(
+    loader: DatasetLoader, session_id: str, ds: xr.Dataset
+) -> None:
+    """Merge top-level session zarr attrs into ds.attrs to expose subject_id.
+
+    Processed data attrs take precedence on key conflicts.
+    """
+    top_level_attrs = dict(loader.combined_zarr[session_id].attrs)
+    ds.attrs.update({**top_level_attrs, **ds.attrs})
+
+
 def load_session(
     dataset_id: str, session_index: int = 0
 ) -> tuple[DatasetLoader, xr.Dataset, str]:
@@ -56,11 +67,6 @@ def load_session(
     sessions = loader.filter_sessions("dataset_id", dataset_id)
     session_id = sessions[session_index]
     ds = loader.get_processed_data_from_session(session_id)
-    
-    # Merge top-level session attrs (subject_id, object_id, etc.) into dataset attrs.
-    # Processed data attrs take precedence in case of key conflicts.
-    top_level_attrs = dict(loader.combined_zarr[session_id].attrs)
-    merged_attrs = {**top_level_attrs, **ds.attrs}
-    ds.attrs.update(merged_attrs)
+    merge_session_attrs(loader, session_id, ds)
     
     return loader, ds, session_id
