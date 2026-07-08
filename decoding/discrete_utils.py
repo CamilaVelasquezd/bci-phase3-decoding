@@ -250,3 +250,54 @@ def compute_direction_labels_from_position(
         directions.append(direction_idx)
 
     return np.array(directions, dtype=np.int32)
+
+def compute_velocity_labels_binned(
+    ds: xr.Dataset,
+    stat_thresh: float = 0.03,
+    fast_thresh: float = 0.15,
+    n_directions: int = 8,
+) -> np.ndarray:
+    """Discretize cursor velocity into 17 classes at 1kHz bin resolution.
+
+    Classes:
+        0         → stationary (speed < stat_thresh)
+        1–8       → slow directional (stat_thresh <= speed < fast_thresh)
+        9–16      → fast directional (speed >= fast_thresh)
+
+    Direction is computed as arctan2(vy, vx) quantized to the nearest
+    of n_directions evenly spaced angles (0=E, 1=NE, ..., 7=SE).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Session dataset with ds["velocity"] of shape (n_time, 2).
+    stat_thresh : float
+        Speed threshold below which a bin is considered stationary.
+    fast_thresh : float
+        Speed threshold above which a bin is considered fast.
+    n_directions : int
+        Number of directions. Default 8.
+
+    Returns
+    -------
+    np.ndarray
+        Shape (n_time,), int32. Discrete velocity label per timestep.
+    """
+    velocity = ds["velocity"].values  # (n_time, 2)
+    vx = velocity[:, 0]
+    vy = velocity[:, 1]
+    speed = np.sqrt(vx**2 + vy**2)
+
+    # Magnitude class: 0=stationary, 1=slow, 2=fast
+    magnitude = np.where(speed < stat_thresh, 0,
+                np.where(speed < fast_thresh, 1, 2))
+
+    # Direction: quantize arctan2 to nearest multiple of pi/4
+    angle = np.arctan2(vy, vx) % (2 * np.pi)
+    direction = np.round(angle / (2 * np.pi / n_directions)).astype(int) % n_directions
+
+    # Combine into 17 classes
+    labels = np.where(magnitude == 0, 0,
+             np.where(magnitude == 1, direction + 1, direction + n_directions + 1))
+
+    return labels.astype(np.int32)
